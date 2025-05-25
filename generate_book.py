@@ -511,6 +511,9 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
     tokenizer_model_name = ollama_config.get(
         "tokenizer_model", "NousResearch/Llama-3-8B-Instruct-hf"
     )  # Default Llama3 tokenizer
+    context_window_size = ollama_config.get(
+        "context_window_size", None
+    )  # Default to None if not specified
 
     max_retries = int(ollama_config.get("max_retries", default_max_retries))
     retry_delay = int(ollama_config.get("retry_delay_seconds", default_retry_delay))
@@ -528,8 +531,18 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
         "model": model_name,
         "prompt": prompt,
         "stream": stream_ollama,
-        "options": {"temperature": temperature},
+        "options": {
+            "temperature": temperature,
+            # num_ctx will be added below if specified
+        },
     }
+
+    if context_window_size is not None:
+        try:
+            payload["options"]["num_ctx"] = int(context_window_size)
+            logging.info(f"Ollama context window size (num_ctx) set to: {payload['options']['num_ctx']}")
+        except ValueError:
+            logging.warning(f"Invalid 'context_window_size' value: {context_window_size}. It must be an integer. Using Ollama's default.")
 
     if verbose_debug:
         logging.info(f"Ollama API Prompt for model '{model_name}':\n{prompt}")
@@ -1811,14 +1824,14 @@ Output in British English."""
     appendix_subsection_titles = generate_appendix_subsection_titles(
         config, book_title, writing_tone, summary_context
     )
-    appendix_content_parts = []
+    appendix_items = [] # Changed from appendix_content_parts
 
     if appendix_subsection_titles:
         logging.info(
             f"Generated {len(appendix_subsection_titles)} appendix subsection titles: {', '.join(appendix_subsection_titles)}"
         )
         for sub_title in appendix_subsection_titles:
-            sub_content = generate_appendix_subsection_content(
+            sub_content_md = generate_appendix_subsection_content( # Renamed for clarity
                 config,
                 book_title,
                 writing_tone,
@@ -1826,32 +1839,32 @@ Output in British English."""
                 sub_title,
                 appendix_subsection_titles,
             )
-            if sub_content:
-                # Add Markdown H2 style for the subsection title, followed by its content
-                appendix_content_parts.append(f"## {sub_title}\n\n{sub_content}\n\n")
+            current_item = {"title": sub_title}
+            if sub_content_md:
+                current_item["content"] = sub_content_md
             else:
                 logging.warning(
                     f"Content generation failed for Appendix subsection: '{sub_title}'. Adding placeholder."
                 )
-                appendix_content_parts.append(
-                    f"## {sub_title}\n\n[Content generation failed for this subsection.]\n\n"
-                )
-        final_appendix_content = "".join(appendix_content_parts).strip()
-        if not final_appendix_content and appendix_subsection_titles: # Had titles but all content failed
-            final_appendix_content = "[Appendix content generation failed for all subsections.]"
-        elif not appendix_subsection_titles: # No titles generated
-            final_appendix_content = "[Appendix generation failed: No subsection titles were generated.]"
+                current_item["content"] = "[Content generation failed for this subsection.]"
+            appendix_items.append(current_item)
+
+        if appendix_items: # If we have items (even with failed content)
+            back_matter["appendix"] = appendix_items
+        else: # Should not happen if appendix_subsection_titles was non-empty, but as a safeguard
+            logging.warning("Appendix subsection titles were present, but no items were created. Appendix will be placeholder.")
+            back_matter["appendix"] = "[Appendix generation failed: Could not process subsections.]" # String placeholder
+
     else:
         logging.warning("Failed to generate appendix subsection titles. Appendix will be minimal or placeholder.")
-        final_appendix_content = "[Appendix generation failed: Could not determine subsections.]"
-    back_matter["appendix"] = final_appendix_content
+        back_matter["appendix"] = "[Appendix generation failed: Could not determine subsections.]" # String placeholder
     # --- End Appendix Handling ---
 
     bm_elements_prompts = {
         # Appendix is handled above
         "Glossary": f"Create a Glossary defining key terms found in the book {common_prompt_base}",
         "Bibliography": f"Create a Bibliography listing fictional or real sources relevant to the book's content {common_prompt_base}",
-        "About the Author": f"Write an 'About the Author' section for {author_gender} author {author_name} {common_prompt_base}",
+        "About the Author": f"Write an 'About the Author' section for {author_gender} author {author_name} {common_prompt_base}. Ensure the output is suitable for a book.",
     }
     for element, prompt in bm_elements_prompts.items():
         key = element.lower().replace(" ", "_")
@@ -3522,11 +3535,14 @@ def assemble_docx(
     has_bm_content = False
     bm_added_count = 0
     valid_bm_keys = [
-        k
-        for k in bm_order
-        if back_matter.get(k)
-        and not back_matter[k].startswith(
-            f"[{k.replace('_', ' ').title()} content generation failed.]"
+        key
+        for key in bm_order
+        if back_matter.get(key) and (
+            (isinstance(back_matter[key], list) and key == "appendix") # Appendix is valid if it's a list
+            or (
+                isinstance(back_matter[key], str) and # For strings (including appendix placeholders or other items)
+                not back_matter[key].startswith(f"[{key.replace('_', ' ').title()} content generation failed.]")
+            )
         )
     ]
 
@@ -3537,17 +3553,41 @@ def assemble_docx(
         title = key.replace("_", " ").title()
         # Add title (spacing handled by style)
         doc.add_paragraph(title, style="Heading 1")
-        # Pass the main doc object as the container
-        context_label = f"BackMatter_{key}"
-        markdown_to_docx(
-            content,
-            doc,
-            doc,
-            config,
-            usable_width_inches,
-            equation_image_dir,
-            context_label=context_label,
-        )
+
+        if key == "appendix" and isinstance(content, list):
+            # Content is a list of appendix subsections
+            num_subsections = len(content)
+            for idx, subsection_data in enumerate(content):
+                sub_title = subsection_data.get("title", "Untitled Subsection")
+                sub_content_md = subsection_data.get("content", "[Content missing]")
+
+                doc.add_paragraph(sub_title, style="Heading 2") # Add subsection title
+                context_label_sub = f"BackMatter_Appendix_{sanitize_filename(sub_title, 30)}"
+                markdown_to_docx(
+                    sub_content_md,
+                    doc, # container_obj
+                    doc, # doc (main document)
+                    config,
+                    usable_width_inches,
+                    equation_image_dir,
+                    context_label=context_label_sub,
+                )
+                if idx < num_subsections - 1: # If not the last subsection
+                    doc.add_page_break()
+        else:
+            # Existing behavior for other back matter items (content is a string)
+            # or if appendix is a fallback string placeholder
+            context_label = f"BackMatter_{key}"
+            markdown_to_docx(
+                content if isinstance(content, str) else "[Invalid content format for this back matter item]",
+                doc, # container_obj
+                doc, # doc (main document)
+                config,
+                usable_width_inches,
+                equation_image_dir,
+                context_label=context_label,
+            )
+
         has_bm_content = True
         bm_added_count += 1
 
