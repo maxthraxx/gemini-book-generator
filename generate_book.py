@@ -1699,6 +1699,100 @@ Output in British English.
     return front_matter
 
 
+def generate_appendix_subsection_titles(
+    config, book_title, writing_tone, summary_context
+):
+    """Generates a list of potential subsection titles for the Appendix."""
+    logging.info(f"Generating subsection titles for Appendix of book: '{book_title}'")
+    main_topic = config["generation_params"]["main_topic"]
+    setting = config["generation_params"]["setting"]
+
+    prompt = f"""
+Based on the book '{book_title}' about '{main_topic}',
+with the setting: "{setting}",
+and considering the following chapter summaries (if available):
+{summary_context if summary_context.strip() and summary_context != "[No chapter summaries available]" else "No chapter summaries were provided for context."}
+
+Generate a list of potential subsection titles for an Appendix section.
+The appendix should contain supplementary material, detailed explanations,
+data, or further readings relevant to the book's topic.
+
+Format the output as a numbered list, with each title on a new line.
+Example:
+1. Subsection Title One
+2. Another Relevant Subsection
+3. Detailed Data Tables
+
+Provide *only* the numbered list of subsection titles.
+Do not add introductory text like "Here are the subsection titles:".
+Output in British English.
+"""
+    cache_prefix = "appendix_subsection_titles"
+    titles_text = call_llm_api(prompt, config, cache_prefix=cache_prefix)
+
+    if titles_text:
+        subsection_titles = []
+        for line in titles_text.strip().split("\n"):
+            line = line.strip()
+            match = re.match(r"^\d+\.\s*(.*)", line)
+            if match:
+                title = match.group(1).strip()
+                if title:
+                    subsection_titles.append(title)
+        if subsection_titles:
+            logging.info(
+                f"Successfully generated {len(subsection_titles)} appendix subsection titles."
+            )
+            return subsection_titles
+        else:
+            logging.warning(
+                f"Could not parse appendix subsection titles from API response: {titles_text}"
+            )
+            return []
+    else:
+        logging.error("Failed to generate appendix subsection titles via API.")
+        return []
+
+
+def generate_appendix_subsection_content(
+    config, book_title, writing_tone, summary_context, subsection_title, all_subsection_titles
+):
+    """Generates content for a specific appendix subsection."""
+    logging.info(f"Generating content for Appendix subsection: '{subsection_title}'")
+    main_topic = config["generation_params"]["main_topic"]
+    setting = config["generation_params"]["setting"]
+
+    prompt = f"""
+Context for the book:
+- Title: '{book_title}'
+- Main Topic: '{main_topic}'
+- Setting: "{setting}"
+- Chapter Summaries (if available): {summary_context if summary_context.strip() and summary_context != "[No chapter summaries available]" else "No chapter summaries were provided for context."}
+- Desired Writing Tone: {writing_tone}
+
+Appendix Context:
+- All planned subsection titles for this appendix: {', '.join(all_subsection_titles)}
+- Current Subsection to write content for: '{subsection_title}'
+
+Task:
+Write the detailed content for the appendix subsection titled '{subsection_title}'.
+Ensure the content is supplementary, informative, and directly relevant to this subsection's title and the overall book topic.
+Avoid repeating content extensively covered in the main chapters (as suggested by the chapter summaries).
+
+Instructions:
+- Write substantial content for this subsection.
+- Output *only* the text content for this subsection.
+- Do *not* include the subsection title (e.g., "## {subsection_title}") in the output itself; start directly with the content.
+- Format the output using standard Markdown (paragraphs, lists, bold, italics, tables).
+- CRITICAL: Ensure all bulleted or numbered lists are preceded by a blank line in the Markdown output.
+- Ensure paragraphs are separated by double line breaks in the Markdown source.
+- If mathematical equations are necessary, format them using standard LaTeX syntax: use $...$ for inline math and $$...$$ for display math.
+- Write the entire output in British English.
+"""
+    cache_prefix = f"appendix_content_{sanitize_filename(subsection_title, 60)}"
+    content = call_llm_api(prompt, config, cache_prefix=cache_prefix)
+    return content.strip() if content else None
+
 def generate_back_matter(
     config, book_title, author_name, author_gender, writing_tone, summary_context
 ):
@@ -1711,17 +1805,57 @@ of the book '{book_title}' about {config['generation_params']['main_topic']}, wi
 Maintain a tone that is {writing_tone}.
 Do not add introductory text. Output *only* the text content for this section.
 Output in British English."""
+
+    # --- Handle Appendix Separately with Subsections ---
+    logging.info("Generating Appendix content with subsections...")
+    appendix_subsection_titles = generate_appendix_subsection_titles(
+        config, book_title, writing_tone, summary_context
+    )
+    appendix_content_parts = []
+
+    if appendix_subsection_titles:
+        logging.info(
+            f"Generated {len(appendix_subsection_titles)} appendix subsection titles: {', '.join(appendix_subsection_titles)}"
+        )
+        for sub_title in appendix_subsection_titles:
+            sub_content = generate_appendix_subsection_content(
+                config,
+                book_title,
+                writing_tone,
+                summary_context,
+                sub_title,
+                appendix_subsection_titles,
+            )
+            if sub_content:
+                # Add Markdown H2 style for the subsection title, followed by its content
+                appendix_content_parts.append(f"## {sub_title}\n\n{sub_content}\n\n")
+            else:
+                logging.warning(
+                    f"Content generation failed for Appendix subsection: '{sub_title}'. Adding placeholder."
+                )
+                appendix_content_parts.append(
+                    f"## {sub_title}\n\n[Content generation failed for this subsection.]\n\n"
+                )
+        final_appendix_content = "".join(appendix_content_parts).strip()
+        if not final_appendix_content and appendix_subsection_titles: # Had titles but all content failed
+            final_appendix_content = "[Appendix content generation failed for all subsections.]"
+        elif not appendix_subsection_titles: # No titles generated
+            final_appendix_content = "[Appendix generation failed: No subsection titles were generated.]"
+    else:
+        logging.warning("Failed to generate appendix subsection titles. Appendix will be minimal or placeholder.")
+        final_appendix_content = "[Appendix generation failed: Could not determine subsections.]"
+    back_matter["appendix"] = final_appendix_content
+    # --- End Appendix Handling ---
+
     bm_elements_prompts = {
-        "Appendix": f"Write an Appendix containing supplementary material relevant to the book's topic {common_prompt_base}",
+        # Appendix is handled above
         "Glossary": f"Create a Glossary defining key terms found in the book {common_prompt_base}",
         "Bibliography": f"Create a Bibliography listing fictional or real sources relevant to the book's content {common_prompt_base}",
         "About the Author": f"Write an 'About the Author' section for {author_gender} author {author_name} {common_prompt_base}",
     }
     for element, prompt in bm_elements_prompts.items():
         key = element.lower().replace(" ", "_")
-        # Use the key as the prefix
-        cache_prefix_str = key
-        content = call_llm_api(prompt, config, cache_prefix=cache_prefix_str)
+        content = call_llm_api(prompt, config, cache_prefix=key)
         back_matter[key] = (
             content.strip() if content else f"[{element} content generation failed.]"
         )
