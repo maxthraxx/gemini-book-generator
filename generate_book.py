@@ -3434,22 +3434,7 @@ def assemble_docx(
             f"[{key.title()} content generation failed.]"
         ):
             if has_fm_content:  # Add page break before subsequent FM sections
-                doc.add_section(WD_SECTION.ODD_PAGE)
-                current_section = doc.sections[-1]
-                previous_section = doc.sections[-2]
-                # Copy page setup
-                current_section.page_height = previous_section.page_height
-                current_section.page_width = previous_section.page_width
-                current_section.left_margin = previous_section.left_margin
-                current_section.right_margin = previous_section.right_margin
-                current_section.top_margin = previous_section.top_margin
-                current_section.bottom_margin = previous_section.bottom_margin
-                current_section.gutter = previous_section.gutter
-
-                # Ensure mirrorMargins is also set for the new section
-                sectPr_current = current_section._sectPr
-                pgMar_current = sectPr_current.get_or_add_pgMar()
-                pgMar_current.set(qn("w:mirrorMargins"), "true")
+                doc.add_page_break()
 
             title = key.replace("_", " ").title()
             # Add space before title is handled by Heading 1 style now
@@ -3525,22 +3510,7 @@ def assemble_docx(
 
         # Add page break after chapter, except for the last one
         if i < len(chapter_keys) - 1:
-            doc.add_section(WD_SECTION.ODD_PAGE)
-            current_section = doc.sections[-1]
-            previous_section = doc.sections[-2]
-            # Copy page setup
-            current_section.page_height = previous_section.page_height
-            current_section.page_width = previous_section.page_width
-            current_section.left_margin = previous_section.left_margin
-            current_section.right_margin = previous_section.right_margin
-            current_section.top_margin = previous_section.top_margin
-            current_section.bottom_margin = previous_section.bottom_margin
-            current_section.gutter = previous_section.gutter
-
-            # Ensure mirrorMargins is also set for the new section
-            sectPr_current = current_section._sectPr
-            pgMar_current = sectPr_current.get_or_add_pgMar()
-            pgMar_current.set(qn("w:mirrorMargins"), "true")
+            doc.add_page_break()
 
     # Set page numbering for the body section (starts at 1)
     set_page_numbering(section3, format_code="decimal", start_number=1)
@@ -3604,22 +3574,7 @@ def assemble_docx(
     for i, key in enumerate(valid_bm_keys):
         content = back_matter[key]
         if has_bm_content:  # Add page break before subsequent BM sections
-            doc.add_section(WD_SECTION.ODD_PAGE)
-            current_section = doc.sections[-1]
-            previous_section = doc.sections[-2]
-            # Copy page setup
-            current_section.page_height = previous_section.page_height
-            current_section.page_width = previous_section.page_width
-            current_section.left_margin = previous_section.left_margin
-            current_section.right_margin = previous_section.right_margin
-            current_section.top_margin = previous_section.top_margin
-            current_section.bottom_margin = previous_section.bottom_margin
-            current_section.gutter = previous_section.gutter
-
-            # Ensure mirrorMargins is also set for the new section
-            sectPr_current = current_section._sectPr
-            pgMar_current = sectPr_current.get_or_add_pgMar()
-            pgMar_current.set(qn("w:mirrorMargins"), "true")
+            doc.add_page_break()
         title = key.replace("_", " ").title()
         # Add title (spacing handled by style)
         doc.add_paragraph(title, style="Heading 1")
@@ -3645,22 +3600,8 @@ def assemble_docx(
                     context_label=context_label_sub,
                 )
                 if idx < num_subsections - 1:  # If not the last subsection
-                    doc.add_section(WD_SECTION.ODD_PAGE)
-                    current_section = doc.sections[-1]
-                    previous_section = doc.sections[-2]
-                    # Copy page setup
-                    current_section.page_height = previous_section.page_height
-                    current_section.page_width = previous_section.page_width
-                    current_section.left_margin = previous_section.left_margin
-                    current_section.right_margin = previous_section.right_margin
-                    current_section.top_margin = previous_section.top_margin
-                    current_section.bottom_margin = previous_section.bottom_margin
-                    current_section.gutter = previous_section.gutter
+                    doc.add_page_break()
 
-                    # Ensure mirrorMargins is also set for the new section
-                    sectPr_current = current_section._sectPr
-                    pgMar_current = sectPr_current.get_or_add_pgMar()
-                    pgMar_current.set(qn("w:mirrorMargins"), "true")
         else:
             # Existing behavior for other back matter items (content is a string)
             # or if appendix is a fallback string placeholder
