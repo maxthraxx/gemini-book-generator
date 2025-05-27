@@ -1596,11 +1596,31 @@ Output *only* the text content for this section. Do not add introductory text.
 Output in British English.
 """
     fm_elements_prompts = {
-        "Dedication": f"Write an inspiring dedication {common_prompt_base}",
-        "Foreword": f"Write a Foreword by a fictional expert relevant {common_prompt_base}. Make sure this fictional expert provides their name and credential at the end. Discuss the book's significance or context.",
-        "Preface": f"Write a Preface {common_prompt_base}.  {author_name} explains their motivation or the book's scope.",
-        "Acknowledgements": f"Write an Acknowledgements {common_prompt_base}. {author_name} thanks individuals and groups who contributed.",
+        "Dedication": f"Write an inspiring dedication {common_prompt_base}",  # Dedication is usually always present
+        # Foreword generation is now conditional
+        "Preface": f"Write a Preface {common_prompt_base}. {author_name} explains their motivation or the book's scope.",
+        # Acknowledgements generation will also be conditional
     }
+
+    # Conditionally add Foreword prompt
+    gen_params = config.get("generation_params", {})
+    should_generate_foreword = gen_params.get(
+        "generate_foreword", True
+    )  # Default to True if not specified
+    if should_generate_foreword:
+        fm_elements_prompts["Foreword"] = (
+            f"Write a Foreword by a fictional expert relevant {common_prompt_base}. Make sure this fictional expert provides their name and credential at the end. Discuss the book's significance or context."
+        )
+
+    # Conditionally add Acknowledgements prompt
+    should_generate_acknowledgements = gen_params.get(
+        "generate_acknowledgements", True
+    )  # Default to True
+    if should_generate_acknowledgements:
+        fm_elements_prompts["Acknowledgements"] = (
+            f"Write an Acknowledgements {common_prompt_base}. {author_name} thanks individuals and groups who contributed."
+        )
+
     for element, prompt in fm_elements_prompts.items():
         logging.info(f"Generating {element}...")
         # Use the element name (lowercase) as the prefix
@@ -1650,6 +1670,19 @@ Output in British English.
         else:
             logging.warning(f"Failed to generate content for {element}.")
             # processed_content already holds the error message
+
+        # Ensure Foreword key exists even if not generated, to avoid key errors later
+        if element == "Foreword" and not should_generate_foreword:
+            front_matter[element.lower()] = (
+                None  # Or an empty string, depending on how you want to handle it
+            )
+            logging.info("Foreword generation skipped as per 'generate_foreword' flag.")
+        # Ensure Acknowledgements key exists even if not generated
+        elif element == "Acknowledgements" and not should_generate_acknowledgements:
+            front_matter[element.lower()] = None
+            logging.info(
+                "Acknowledgements generation skipped as per 'generate_acknowledgements' flag."
+            )
 
         front_matter[element.lower()] = processed_content
 
@@ -1827,7 +1860,9 @@ Output in British English."""
                 "[Appendix generation failed: Could not determine subsections.]"  # String placeholder
             )
     else:
-        logging.info("Appendix generation skipped as per 'generate_appendix' flag in config.")
+        logging.info(
+            "Appendix generation skipped as per 'generate_appendix' flag in config."
+        )
         # Set to None so it's skipped by assemble_docx's valid_bm_keys logic
         back_matter["appendix"] = None
     # --- End Appendix Handling ---
@@ -3324,7 +3359,7 @@ def assemble_docx(
         # Optional: Create and apply an 'Author' style
 
     # --- Section Break for Copyright Page (Starts Section 1) ---
-    doc.add_section(WD_SECTION.NEW_PAGE)
+    doc.add_section(WD_SECTION.ODD_PAGE)
     section1 = doc.sections[1]
     # Copy page setup from section 0 to section 1
     section1.page_height = section0.page_height
@@ -3372,7 +3407,7 @@ def assemble_docx(
                 run.font.size = Pt(font_size - 2)  # Assuming font_size is defined
 
     # --- Section Break for Rest of Front Matter (Starts Section 2) ---
-    doc.add_section(WD_SECTION.NEW_PAGE)
+    doc.add_section(WD_SECTION.ODD_PAGE)
     section2 = doc.sections[2]
     # Copy page setup from section 0 to section 2
     section2.page_height = section0.page_height
@@ -3399,7 +3434,23 @@ def assemble_docx(
             f"[{key.title()} content generation failed.]"
         ):
             if has_fm_content:  # Add page break before subsequent FM sections
-                doc.add_page_break()
+                doc.add_section(WD_SECTION.ODD_PAGE)
+                current_section = doc.sections[-1]
+                previous_section = doc.sections[-2]
+                # Copy page setup
+                current_section.page_height = previous_section.page_height
+                current_section.page_width = previous_section.page_width
+                current_section.left_margin = previous_section.left_margin
+                current_section.right_margin = previous_section.right_margin
+                current_section.top_margin = previous_section.top_margin
+                current_section.bottom_margin = previous_section.bottom_margin
+                current_section.gutter = previous_section.gutter
+
+                # Ensure mirrorMargins is also set for the new section
+                sectPr_current = current_section._sectPr
+                pgMar_current = sectPr_current.get_or_add_pgMar()
+                pgMar_current.set(qn("w:mirrorMargins"), "true")
+
             title = key.replace("_", " ").title()
             # Add space before title is handled by Heading 1 style now
             doc.add_paragraph(title, style="Heading 1")
@@ -3422,7 +3473,7 @@ def assemble_docx(
     logging.info("Set Front Matter page numbering (lowerRoman, starting iii).")
 
     # --- Section Break for Body Matter (Starts Section 3) ---
-    doc.add_section(WD_SECTION.NEW_PAGE)
+    doc.add_section(WD_SECTION.ODD_PAGE)
     section3 = doc.sections[3]
     # Copy page setup from section 0 to section 3
     section3.page_height = section0.page_height
@@ -3474,14 +3525,29 @@ def assemble_docx(
 
         # Add page break after chapter, except for the last one
         if i < len(chapter_keys) - 1:
-            doc.add_page_break()
+            doc.add_section(WD_SECTION.ODD_PAGE)
+            current_section = doc.sections[-1]
+            previous_section = doc.sections[-2]
+            # Copy page setup
+            current_section.page_height = previous_section.page_height
+            current_section.page_width = previous_section.page_width
+            current_section.left_margin = previous_section.left_margin
+            current_section.right_margin = previous_section.right_margin
+            current_section.top_margin = previous_section.top_margin
+            current_section.bottom_margin = previous_section.bottom_margin
+            current_section.gutter = previous_section.gutter
+
+            # Ensure mirrorMargins is also set for the new section
+            sectPr_current = current_section._sectPr
+            pgMar_current = sectPr_current.get_or_add_pgMar()
+            pgMar_current.set(qn("w:mirrorMargins"), "true")
 
     # Set page numbering for the body section (starts at 1)
     set_page_numbering(section3, format_code="decimal", start_number=1)
     logging.info("Set Body Matter page numbering (decimal, starting at 1).")
 
     # --- Section Break for Back Matter (Starts Section 4) ---
-    doc.add_section(WD_SECTION.NEW_PAGE)
+    doc.add_section(WD_SECTION.ODD_PAGE)
     section4 = doc.sections[4]
     # Copy page setup from section 0 to section 4
     section4.page_height = section0.page_height
@@ -3500,6 +3566,20 @@ def assemble_docx(
     # --- Section 4: Back Matter (Continues numbering) ---
     logging.info("Adding Back Matter (Section 4, continuing numbering)...")
     bm_order = ["appendix", "glossary", "bibliography", "about_the_author"]
+
+    # Conditionally exclude "About the Author" from the main book based on config
+    gen_params = config.get("generation_params", {})
+    include_about_author_in_main = gen_params.get(
+        "include_about_author_in_main_book", True
+    )  # Default to True
+
+    if not include_about_author_in_main:
+        if "about_the_author" in bm_order:
+            bm_order.remove("about_the_author")
+            logging.info(
+                "'About the Author' section will be excluded from the main book as per config."
+            )
+
     has_bm_content = False
     bm_added_count = 0
     valid_bm_keys = [
@@ -3524,7 +3604,22 @@ def assemble_docx(
     for i, key in enumerate(valid_bm_keys):
         content = back_matter[key]
         if has_bm_content:  # Add page break before subsequent BM sections
-            doc.add_page_break()
+            doc.add_section(WD_SECTION.ODD_PAGE)
+            current_section = doc.sections[-1]
+            previous_section = doc.sections[-2]
+            # Copy page setup
+            current_section.page_height = previous_section.page_height
+            current_section.page_width = previous_section.page_width
+            current_section.left_margin = previous_section.left_margin
+            current_section.right_margin = previous_section.right_margin
+            current_section.top_margin = previous_section.top_margin
+            current_section.bottom_margin = previous_section.bottom_margin
+            current_section.gutter = previous_section.gutter
+
+            # Ensure mirrorMargins is also set for the new section
+            sectPr_current = current_section._sectPr
+            pgMar_current = sectPr_current.get_or_add_pgMar()
+            pgMar_current.set(qn("w:mirrorMargins"), "true")
         title = key.replace("_", " ").title()
         # Add title (spacing handled by style)
         doc.add_paragraph(title, style="Heading 1")
@@ -3550,7 +3645,22 @@ def assemble_docx(
                     context_label=context_label_sub,
                 )
                 if idx < num_subsections - 1:  # If not the last subsection
-                    doc.add_page_break()
+                    doc.add_section(WD_SECTION.ODD_PAGE)
+                    current_section = doc.sections[-1]
+                    previous_section = doc.sections[-2]
+                    # Copy page setup
+                    current_section.page_height = previous_section.page_height
+                    current_section.page_width = previous_section.page_width
+                    current_section.left_margin = previous_section.left_margin
+                    current_section.right_margin = previous_section.right_margin
+                    current_section.top_margin = previous_section.top_margin
+                    current_section.bottom_margin = previous_section.bottom_margin
+                    current_section.gutter = previous_section.gutter
+
+                    # Ensure mirrorMargins is also set for the new section
+                    sectPr_current = current_section._sectPr
+                    pgMar_current = sectPr_current.get_or_add_pgMar()
+                    pgMar_current.set(qn("w:mirrorMargins"), "true")
         else:
             # Existing behavior for other back matter items (content is a string)
             # or if appendix is a fallback string placeholder
@@ -3661,6 +3771,14 @@ def assemble_marketing_docx(
     doc.add_paragraph("Book Details", style="Heading 1")
 
     random_topic_seed = gen_params.get("random_topic_seed")
+
+    book_title_marketing = gen_params.get("book_title", "[Not Specified]")
+    doc.add_paragraph("Book Title:", style="Heading 2")
+    doc.add_paragraph(book_title_marketing)
+
+    book_subtitle_marketing = gen_params.get("book_subtitle", "[Not Specified]")
+    doc.add_paragraph("Book Subtitle:", style="Heading 2")
+    doc.add_paragraph(book_subtitle_marketing)
     if random_topic_seed:
         doc.add_paragraph("Random Topic Seed:", style="Heading 2")
         doc.add_paragraph(random_topic_seed)
