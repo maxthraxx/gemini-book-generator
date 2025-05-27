@@ -31,9 +31,9 @@ from random_words import RandomWords
 
 # Configure Matplotlib to use LaTeX and load amsmath
 matplotlib.rcParams["text.usetex"] = True
-matplotlib.rcParams[
-    "text.latex.preamble"
-] = r"\usepackage{amsmath}  \usepackage{amssymb}"
+matplotlib.rcParams["text.latex.preamble"] = (
+    r"\usepackage{amsmath}  \usepackage{amssymb}"
+)
 
 # Ensure matplotlib doesn't try to use a GUI backend
 plt.switch_backend("Agg")
@@ -540,9 +540,13 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
     if context_window_size is not None:
         try:
             payload["options"]["num_ctx"] = int(context_window_size)
-            logging.info(f"Ollama context window size (num_ctx) set to: {payload['options']['num_ctx']}")
+            logging.info(
+                f"Ollama context window size (num_ctx) set to: {payload['options']['num_ctx']}"
+            )
         except ValueError:
-            logging.warning(f"Invalid 'context_window_size' value: {context_window_size}. It must be an integer. Using Ollama's default.")
+            logging.warning(
+                f"Invalid 'context_window_size' value: {context_window_size}. It must be an integer. Using Ollama's default."
+            )
 
     if verbose_debug:
         logging.info(f"Ollama API Prompt for model '{model_name}':\n{prompt}")
@@ -773,8 +777,7 @@ def generate_random_name(config, gender):
 for a fictional author. The author's gender is {gender}.
 The author is notionally writing a book about
 '{config['generation_params']['main_topic']}'. The setting of the book is
-described as: {config['generation_params']['setting']}. Key concepts
-include: {', '.join(config['generation_params']['key_concepts'])}.
+described as: {config['generation_params']['setting']}.
 Consider a name that might appear on a book. Output *only* the full name.
 Do not add introductory text, explanations, or quotation marks."""
 
@@ -887,7 +890,6 @@ def generate_writing_tone(config):
     setting = config.get("generation_params", {}).get(
         "setting", "[No  Setting Provided]"
     )
-    key_concepts = config.get("generation_params", {}).get("key_concepts", [])
 
     if main_topic == "[No Main Topic Provided]" or setting == "[No  Setting Provided]":
         logging.warning(
@@ -897,14 +899,8 @@ def generate_writing_tone(config):
 for a book. Output only the phrase describing the tone. Do not add introductory
 text. Output in British English."""
     else:
-        concepts_str = (
-            ", ".join(key_concepts)
-            if key_concepts
-            else "[No specific concepts provided]"
-        )
         prompt = f"""Based on the main topic '{main_topic}', a setting described as:
-"{setting}" and key concepts including: {concepts_str}, generate some words
-describing the most suitable writing tone for a book exploring this
+"{setting}", generate some words describing the most suitable writing tone for a book exploring this
 topic. Output *only* the phrase describing the tone. Do not add introductory
 text. Output in British English."""
     tone_text = call_llm_api(prompt, config, cache_prefix="writing_tone")
@@ -922,55 +918,12 @@ text. Output in British English."""
         return None
 
 
-def generate_key_concepts(config):
-    """Generates key concepts using the Gemini API based on topic and setting."""
-    logging.info("Auto-generating key concepts...")
-
-    main_topic = config.get("generation_params", {}).get(
-        "main_topic", "[No Main Topic Provided]"
-    )
-    setting = config.get("generation_params", {}).get(
-        "setting", "[No  Setting Provided]"
-    )
-
-    if main_topic == "[No Main Topic Provided]" or setting == "[No  Setting Provided]":
-        logging.error(
-            "Cannot generate key concepts without 'main_topic' and 'generation_params.setting' in config."
-        )
-        return None
-
-    prompt = f"""Based on the main topic '{main_topic}' in a setting described as:
-"{setting}"
-
-Generate a short list of distinct and relevant key concepts or
-terms that would be central to exploring this topic within the setting.
-
-Format the output as a simple comma-separated list. Example:
-Concept One, Concept Two, Another Key Term, Fourth Idea, Final Concept
-
-Provide *only* the comma-separated list of concepts. Do not add introductory text.
-Output in British English."""
-
-    concepts_text = call_llm_api(prompt, config, cache_prefix="key_concepts")
-
-    if concepts_text:
-        cleaned_text = concepts_text.strip().strip("\"'")
-        generated_concepts = [
-            concept.strip() for concept in cleaned_text.split(",") if concept.strip()
-        ]
-        return generated_concepts
-    else:
-        logging.error("Failed to generate key concepts via API.")
-        return None
-
-
 def generate_book_title(config):
     """Generates the book title using the Gemini API. Exits script on failure."""
     logging.info("Generating book title...")
     prompt = f"""Generate the book title for a book about
 '{config['generation_params']['main_topic']}'. The setting of the book is
-described as: {config['generation_params']['setting']}. Key concepts
-include: {', '.join(config['generation_params']['key_concepts'])}.
+described as: {config['generation_params']['setting']}. 
 Do not generate a two-part title. The generated title must not contain a subtitle.
 Provide only the title text. Do not add introductory text. The title must not
 contain these punctuations: '-' or ':'. Output one title only. Output in
@@ -1005,7 +958,6 @@ def generate_book_subtitle(config, book_title, summary_context):
 The main topic of the book is '{config['generation_params']['main_topic']}'.
 The setting of the book described as:
 {config['generation_params']['setting']}.
-Key concepts include: {', '.join(config['generation_params']['key_concepts'])}.
 {summary_context}
 The subtitle should complement the main title.
 Do not generate a two-part subtitle.
@@ -1055,7 +1007,6 @@ def is_book_non_fiction(config, book_title):
     setting = gen_params.get(
         "setting", "[No Setting Provided]"
     )  # Corrected variable name
-    key_concepts = gen_params.get("key_concepts", [])
 
     if main_topic == "[No Main Topic Provided]":
         logging.warning(
@@ -1066,16 +1017,11 @@ def is_book_non_fiction(config, book_title):
         gen_params["is_fiction"] = True  # Assume fiction
         return False  # is_book_non_fiction returns False for fiction
 
-    concepts_str = (
-        ", ".join(key_concepts) if key_concepts else "[No specific concepts provided]"
-    )
-
     prompt = f"""
 Based on the following details of a book:
 - Title: '{book_title}'
 - Main Topic: '{main_topic}'
 - Setting: "{setting}"
-- Key Concepts: {concepts_str}
 
 Is this book most likely non-fiction?
 Answer with only 'yes' or 'no'. Do not add any explanations, quotation marks, or other text. Just the single word.
@@ -1165,7 +1111,6 @@ def generate_character_list(config, book_title):
 
     main_topic = gen_params.get("main_topic", "[No Main Topic Provided]")
     setting = gen_params.get("setting", "[No Setting Provided]")
-    key_concepts = gen_params.get("key_concepts", [])
 
     # Critical prerequisites for character generation prompt
     if (
@@ -1179,15 +1124,14 @@ def generate_character_list(config, book_title):
         gen_params["character_list"] = None
         return None
 
-    concepts_str = ", ".join(key_concepts) if key_concepts else "[No specific concepts]"
-
     prompt = f"""
 Based on the book titled '{book_title}', which has the main topic '{main_topic}',
-a setting described as: "{setting}", and key concepts including: {concepts_str}.
+a setting described as: "{setting}".
 
-Generate a long list of characters that might appear in such a book.
+Generate a list of characters who appear in this book.
 For each character, provide their full name and a brief description
 of their role, personality, or significance within the context of the topic and setting.
+Do not use words that express uncertainty in the description. Do not use words such as "likely" or "potentially" 
 
 Format the output as a Markdown bulleted list. Each character should be an item.
 Start the item with the character's name in bold, followed by a colon, and then the description.
@@ -1265,30 +1209,30 @@ def format_character_list_for_prompt(character_list):
     if not formatted_items:
         return ""
 
-    return "Potential characters:\n" + "\n".join(formatted_items) + "\n"
+    return (
+        "Potential characters:\n"
+        + "\n".join(formatted_items)
+        + "\n"
+        + "Not all potential characters have to be used."
+    )
 
 
 def generate_chapter_outline(config, character_context=""):
     """Generates a list of chapter titles."""
     logging.info("Generating chapter outline...")
     length_modifier = (
-        config.get("generation_params", {}).get("length_modifier", "").strip()
+        config.get("generation_params", "").get("length_modifier", "").strip()
     )
     is_fiction = config.get("generation_params", {}).get("is_fiction", False)
 
-    # Prepare the length_modifier part with a trailing space if it exists
-    # e.g., "very " or ""
-    actual_length_modifier_segment = f"{length_modifier} " if length_modifier else ""
-
-    if not is_fiction:
-        list_description_for_prompt = f"{actual_length_modifier_segment}short list"
+    if is_fiction:
+        list_description_for_prompt = f"list"
     else:
-        list_description_for_prompt = f"{actual_length_modifier_segment}long list"
+        list_description_for_prompt = f"{length_modifier} short list"
 
     prompt = f"""Generate a {list_description_for_prompt} of chapter titles for a
 book about '{config['generation_params']['main_topic']}'. The setting of the book
 is described as: {config['generation_params']['setting']}.
-Key concepts include: {', '.join(config['generation_params']['key_concepts'])}.
 {character_context}
 The chapters should logically progress through the topic, potentially involving the characters.
 Ensure the list of chapter titles is appropriate for the type of book (fiction/non-fiction).
@@ -1341,11 +1285,13 @@ def generate_chapter_summary(
     logging.info(f"Generating summary for chapter: '{chapter_title}'...")
 
     # --- Build the prompt ---
+    length_modifier = (
+        config.get("generation_params", "").get("length_modifier", "").strip()
+    )
     prompt_parts = [
-        f"Write a short and concise summary for the chapter titled '{chapter_title}'.",
+        f"Write a one-paragraph {length_modifier} short and concise summary for the chapter titled '{chapter_title}'.",
         f"This chapter is part of a book about '{config['generation_params']['main_topic']}'.",
         f"The setting of the book is described as: {config['generation_params']['setting']}.",
-        f"Key concepts: {', '.join(config['generation_params']['key_concepts'])}.",
         f"{character_context}",
     ]
 
@@ -1445,7 +1391,6 @@ def generate_section_titles(
 Context for the entire book:
 Main Topic: '{config['generation_params']['main_topic']}'
 Setting: {config['generation_params']['setting']}
-Key Concepts: {', '.join(config['generation_params']['key_concepts'])}
 {character_context}
 
 Full Chapter Outline:
@@ -1463,7 +1408,7 @@ chapter titled '{chapter_title}'.This chapter's specific summary is:
 Instructions:
 - The section titles should logically break down the chapter's topic as 
 described in *its specific summary*.
-- Consider how the characters might relate to these sections.
+{"- Consider how the characters might relate to these sections." if character_context else ""}
 - Ensure the generated section titles are distinct and avoid significant 
 overlap with topics clearly covered in the *summaries of other chapters* 
 provided above or topics strongly implied by the *titles of other chapters*.
@@ -1535,7 +1480,6 @@ def generate_section_content(
 Context:
 - Book Main Topic: '{config['generation_params']['main_topic']}'
 - Setting: {config['generation_params']['setting']}
-- Key Concepts: {', '.join(config['generation_params']['key_concepts'])}
 {"-" if character_context else ""}{character_context}
 
 ---
@@ -1603,9 +1547,8 @@ def generate_front_matter(
     }
 
     current_year = time.strftime("%Y")
-    front_matter[
-        "copyright_page"
-    ] = f"""
+    front_matter["copyright_page"] = (
+        f"""
 Copyright © {current_year} by {author_name}
 
 
@@ -1643,6 +1586,7 @@ a professional when appropriate. Neither the publisher nor the author shall be
 liable for any loss of profit or any other commercial damages, including but not
 limited to special, incidental, consequential, personal, or other damages.
 """.strip()
+    )
 
     common_prompt_base = f"""
 for the book '{book_title}' about {config['generation_params']['main_topic']}, with the setting:
@@ -1768,7 +1712,12 @@ Output in British English.
 
 
 def generate_appendix_subsection_content(
-    config, book_title, writing_tone, summary_context, subsection_title, all_subsection_titles
+    config,
+    book_title,
+    writing_tone,
+    summary_context,
+    subsection_title,
+    all_subsection_titles,
 ):
     """Generates content for a specific appendix subsection."""
     logging.info(f"Generating content for Appendix subsection: '{subsection_title}'")
@@ -1806,11 +1755,17 @@ Instructions:
     content = call_llm_api(prompt, config, cache_prefix=cache_prefix)
     return content.strip() if content else None
 
+
 def generate_back_matter(
     config, book_title, author_name, author_gender, writing_tone, summary_context
 ):
     """Generates back matter elements."""
     logging.info("Generating back matter...")
+    # Get generation_params, defaulting to an empty dict if not present
+    gen_params = config.get("generation_params", {})
+    # Get the generate_appendix flag, defaulting to True if not specified
+    should_generate_appendix = gen_params.get("generate_appendix", True)
+
     back_matter = {}
     common_prompt_base = f"""
 of the book '{book_title}' about {config['generation_params']['main_topic']}, with the setting:
@@ -1820,50 +1775,65 @@ Do not add introductory text. Output *only* the text content for this section.
 Output in British English."""
 
     # --- Handle Appendix Separately with Subsections ---
-    logging.info("Generating Appendix content with subsections...")
-    appendix_subsection_titles = generate_appendix_subsection_titles(
-        config, book_title, writing_tone, summary_context
-    )
-    appendix_items = [] # Changed from appendix_content_parts
-
-    if appendix_subsection_titles:
-        logging.info(
-            f"Generated {len(appendix_subsection_titles)} appendix subsection titles: {', '.join(appendix_subsection_titles)}"
+    if should_generate_appendix:
+        logging.info("Attempting to generate Appendix content with subsections...")
+        appendix_subsection_titles = generate_appendix_subsection_titles(
+            config, book_title, writing_tone, summary_context
         )
-        for sub_title in appendix_subsection_titles:
-            sub_content_md = generate_appendix_subsection_content( # Renamed for clarity
-                config,
-                book_title,
-                writing_tone,
-                summary_context,
-                sub_title,
-                appendix_subsection_titles,
+        appendix_items = []  # Changed from appendix_content_parts
+
+        if appendix_subsection_titles:
+            logging.info(
+                f"Generated {len(appendix_subsection_titles)} appendix subsection titles: {', '.join(appendix_subsection_titles)}"
             )
-            current_item = {"title": sub_title}
-            if sub_content_md:
-                current_item["content"] = sub_content_md
-            else:
-                logging.warning(
-                    f"Content generation failed for Appendix subsection: '{sub_title}'. Adding placeholder."
+            for sub_title in appendix_subsection_titles:
+                sub_content_md = (
+                    generate_appendix_subsection_content(  # Renamed for clarity
+                        config,
+                        book_title,
+                        writing_tone,
+                        summary_context,
+                        sub_title,
+                        appendix_subsection_titles,
+                    )
                 )
-                current_item["content"] = "[Content generation failed for this subsection.]"
-            appendix_items.append(current_item)
+                current_item = {"title": sub_title}
+                if sub_content_md:
+                    current_item["content"] = sub_content_md
+                else:
+                    logging.warning(
+                        f"Content generation failed for Appendix subsection: '{sub_title}'. Adding placeholder."
+                    )
+                    current_item["content"] = (
+                        "[Content generation failed for this subsection.]"
+                    )
+                appendix_items.append(current_item)
 
-        if appendix_items: # If we have items (even with failed content)
-            back_matter["appendix"] = appendix_items
-        else: # Should not happen if appendix_subsection_titles was non-empty, but as a safeguard
-            logging.warning("Appendix subsection titles were present, but no items were created. Appendix will be placeholder.")
-            back_matter["appendix"] = "[Appendix generation failed: Could not process subsections.]" # String placeholder
+            if appendix_items:  # If we have items (even with failed content)
+                back_matter["appendix"] = appendix_items
+            else:  # Should not happen if appendix_subsection_titles was non-empty, but as a safeguard
+                logging.warning(
+                    "Appendix subsection titles were present, but no items were created. Appendix will be placeholder."
+                )
+                back_matter["appendix"] = (
+                    "[Appendix generation failed: Could not process subsections.]"  # String placeholder
+                )
 
+        else:
+            logging.warning(
+                "Failed to generate appendix subsection titles. Appendix will be minimal or placeholder."
+            )
+            back_matter["appendix"] = (
+                "[Appendix generation failed: Could not determine subsections.]"  # String placeholder
+            )
     else:
-        logging.warning("Failed to generate appendix subsection titles. Appendix will be minimal or placeholder.")
-        back_matter["appendix"] = "[Appendix generation failed: Could not determine subsections.]" # String placeholder
+        logging.info("Appendix generation skipped as per 'generate_appendix' flag in config.")
+        # Set to None so it's skipped by assemble_docx's valid_bm_keys logic
+        back_matter["appendix"] = None
     # --- End Appendix Handling ---
 
     bm_elements_prompts = {
         # Appendix is handled above
-        "Glossary": f"Create a Glossary defining key terms found in the book {common_prompt_base}",
-        "Bibliography": f"Create a Bibliography listing fictional or real sources relevant to the book's content {common_prompt_base}",
         "About the Author": f"Write an 'About the Author' section for {author_gender} author {author_name} {common_prompt_base}. Ensure the output is suitable for a book.",
     }
     for element, prompt in bm_elements_prompts.items():
@@ -1882,12 +1852,10 @@ def generate_book_blurb(config, book_title, summary_context, writing_tone):
 
     main_topic = config["generation_params"]["main_topic"]
     setting = config["generation_params"]["setting"]
-    key_concepts = ", ".join(config["generation_params"]["key_concepts"])
 
     prompt = f"""Write a compelling marketing blurb for a book titled '{book_title}'.
 The main topic of the book is '{main_topic}'.
 The setting of the book is described as: {setting}.
-Key concepts include: {key_concepts}.
 {summary_context}
 The blurb should entice readers while accurately reflecting the book's content.
 Maintain a tone that is {writing_tone}, but adapted for marketing purposes (e.g., more engaging, intriguing).
@@ -3168,9 +3136,9 @@ def assemble_docx(
             title_style.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         else:
             doc.styles["Title"].font.name = font_name
-            doc.styles[
-                "Title"
-            ].paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            doc.styles["Title"].paragraph_format.alignment = (
+                WD_PARAGRAPH_ALIGNMENT.CENTER
+            )
 
         if "Subtitle" not in doc.styles:
             subtitle_style = doc.styles.add_style("Subtitle", WD_STYLE_TYPE.PARAGRAPH)
@@ -3182,9 +3150,9 @@ def assemble_docx(
             subtitle_style.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         else:
             doc.styles["Subtitle"].font.name = font_name
-            doc.styles[
-                "Subtitle"
-            ].paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            doc.styles["Subtitle"].paragraph_format.alignment = (
+                WD_PARAGRAPH_ALIGNMENT.CENTER
+            )
 
         # Ensure List Bullet exists (as before)
         if "List Bullet" not in doc.styles:
@@ -3537,11 +3505,18 @@ def assemble_docx(
     valid_bm_keys = [
         key
         for key in bm_order
-        if back_matter.get(key) and (
-            (isinstance(back_matter[key], list) and key == "appendix") # Appendix is valid if it's a list
+        if back_matter.get(key)
+        and (
+            (
+                isinstance(back_matter[key], list) and key == "appendix"
+            )  # Appendix is valid if it's a list
             or (
-                isinstance(back_matter[key], str) and # For strings (including appendix placeholders or other items)
-                not back_matter[key].startswith(f"[{key.replace('_', ' ').title()} content generation failed.]")
+                isinstance(
+                    back_matter[key], str
+                )  # For strings (including appendix placeholders or other items)
+                and not back_matter[key].startswith(
+                    f"[{key.replace('_', ' ').title()} content generation failed.]"
+                )
             )
         )
     ]
@@ -3561,27 +3536,33 @@ def assemble_docx(
                 sub_title = subsection_data.get("title", "Untitled Subsection")
                 sub_content_md = subsection_data.get("content", "[Content missing]")
 
-                doc.add_paragraph(sub_title, style="Heading 2") # Add subsection title
-                context_label_sub = f"BackMatter_Appendix_{sanitize_filename(sub_title, 30)}"
+                doc.add_paragraph(sub_title, style="Heading 2")  # Add subsection title
+                context_label_sub = (
+                    f"BackMatter_Appendix_{sanitize_filename(sub_title, 30)}"
+                )
                 markdown_to_docx(
                     sub_content_md,
-                    doc, # container_obj
-                    doc, # doc (main document)
+                    doc,  # container_obj
+                    doc,  # doc (main document)
                     config,
                     usable_width_inches,
                     equation_image_dir,
                     context_label=context_label_sub,
                 )
-                if idx < num_subsections - 1: # If not the last subsection
+                if idx < num_subsections - 1:  # If not the last subsection
                     doc.add_page_break()
         else:
             # Existing behavior for other back matter items (content is a string)
             # or if appendix is a fallback string placeholder
             context_label = f"BackMatter_{key}"
             markdown_to_docx(
-                content if isinstance(content, str) else "[Invalid content format for this back matter item]",
-                doc, # container_obj
-                doc, # doc (main document)
+                (
+                    content
+                    if isinstance(content, str)
+                    else "[Invalid content format for this back matter item]"
+                ),
+                doc,  # container_obj
+                doc,  # doc (main document)
                 config,
                 usable_width_inches,
                 equation_image_dir,
@@ -3712,20 +3693,6 @@ def assemble_marketing_docx(
 
     doc.add_paragraph("Setting:", style="Heading 2")
     doc.add_paragraph(gen_params.get("setting", "[Not Specified]"))
-
-    doc.add_paragraph("Key Concepts:", style="Heading 2")
-    key_concepts = gen_params.get("key_concepts", [])
-    if key_concepts:
-        for concept in key_concepts:
-            # Use List Bullet style, ensure it exists
-            list_style = (
-                doc.styles["List Bullet"]
-                if "List Bullet" in doc.styles
-                else doc.styles["Normal"]
-            )
-            doc.add_paragraph(concept, style=list_style)
-    else:
-        doc.add_paragraph("[None Specified]")
 
     # --- Add Character List (if generated) ---
     character_list = gen_params.get("character_list")
@@ -3964,66 +3931,6 @@ if __name__ == "__main__":
     # Log the final setting being used (could be from config, generated, or placeholder)
     logging.info(f"Final setting being used: '{generation_params['setting'][:100]}...'")
 
-    # Determine Key Concepts: Use from config if provided, otherwise generate.
-    key_concepts = generation_params.get("key_concepts")
-
-    # Validate if key_concepts from config is a list and non-empty
-    if key_concepts and isinstance(key_concepts, list):
-        logging.info(
-            f"Using {len(key_concepts)} key concepts provided in configuration."
-        )
-        # Ensure the list contains only strings and strip whitespace
-        generation_params["key_concepts"] = [
-            str(item).strip() for item in key_concepts if str(item).strip()
-        ]
-        # Re-check length after cleaning
-        if not generation_params["key_concepts"]:
-            logging.warning(
-                "Provided key_concepts list was empty after cleaning. Will attempt to generate."
-            )
-            key_concepts = None  # Trigger generation below
-        else:
-            logging.info(
-                f"Validated {len(generation_params['key_concepts'])} key concepts from configuration."
-            )
-
-    else:
-        if key_concepts is not None:  # Log if it was present but invalid
-            logging.warning(
-                f"Invalid or empty 'key_concepts' found in config (type: {type(key_concepts)}). Attempting auto-generation."
-            )
-        else:  # Log if it was missing entirely
-            logging.info(
-                "No 'key_concepts' found in config. Attempting auto-generation."
-            )
-        key_concepts = None  # Ensure generation is triggered
-
-    # Attempt generation if needed
-    if key_concepts is None:
-        logging.info("Attempting to auto-generate key concepts.")
-        generated_concepts = generate_key_concepts(config)  # API call
-        if generated_concepts:
-            generation_params["key_concepts"] = generated_concepts
-            # Format the concepts with newlines for logging
-            concepts_formatted_for_log = "\n".join(
-                f"- {concept}" for concept in generated_concepts
-            )
-            # Log the count and the formatted list
-            logging.info(
-                f"Successfully auto-generated {len(generated_concepts)} key concepts:\n{concepts_formatted_for_log}"
-            )
-        else:
-            logging.warning(
-                "Failed to auto-generate key concepts. Proceeding with an empty list."
-            )
-            generation_params[
-                "key_concepts"
-            ] = []  # Ensure it's an empty list on failure
-
-    # Final log of the count being used
-    final_count = len(generation_params.get("key_concepts", []))
-    logging.info(f"Using {final_count} key concepts for generation.")
-
     # --- Determine Author Name and Gender ---
     author_name = generation_params.get("author_name", "").strip()
     author_gender = generation_params.get("author_gender", "").strip().lower()
@@ -4133,16 +4040,16 @@ if __name__ == "__main__":
         generated_tone = generate_writing_tone(config)  # API call
         if generated_tone:
             writing_tone = generated_tone
-            generation_params[
-                "writing_tone"
-            ] = generated_tone  # Update config in memory
+            generation_params["writing_tone"] = (
+                generated_tone  # Update config in memory
+            )
             logging.info(f"Auto-generated writing tone: '{writing_tone}'")
         else:
             # If generation fails, fall back to the default
             writing_tone = DEFAULT_WRITING_TONE
-            generation_params[
-                "writing_tone"
-            ] = writing_tone  # Store default back in config
+            generation_params["writing_tone"] = (
+                writing_tone  # Store default back in config
+            )
             logging.warning(
                 f"Failed to auto-generate writing tone. Using default: '{writing_tone}'"
             )
@@ -4202,7 +4109,6 @@ if __name__ == "__main__":
     # --- End Fiction Determination ---
 
     # --- Generate Character List (if enabled) ---
-    # This needs book_title, topic, setting, concepts
     generate_character_list(config, book_title)  # API call inside if enabled
     # The result (or None) is stored in config['generation_params']['character_list']
 
