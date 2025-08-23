@@ -148,7 +148,7 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    generation_config=generation_config,
+                    config=generation_config,
                     safety_settings=safety_settings,
                     stream=stream_gemini,
                 )
