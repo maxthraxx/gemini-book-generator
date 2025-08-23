@@ -6,6 +6,7 @@ import pathlib
 import sys
 import time
 
+from google.genai.types import GenerationConfig
 import google.genai as genai
 import requests
 from dotenv import load_dotenv
@@ -126,7 +127,7 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
             # logging.info(f"Gemini API Prompt for model '{model_name}' (first 500 chars):\n{prompt[:500]}...")
 
         client = genai.Client()
-        generation_config = {"temperature": temperature}
+        generation_config = GenerationConfig(temperature=temperature)
 
         # Count tokens for Gemini prompt
         try:
@@ -147,7 +148,7 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                 response = client.models.generate_content(
                     model=model_name,
                     contents=prompt,
-                    generation_config=generation_config,
+                    config=generation_config,
                     safety_settings=safety_settings,
                     stream=stream_gemini,
                 )
