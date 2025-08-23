@@ -1126,7 +1126,7 @@ Output in British English."""
                         writing_tone,
                         summary_context,
                         sub_title,
-                        all_subsection_titles,
+                        appendix_subsection_titles,
                     )
                 )
                 current_item = {"title": sub_title}
