@@ -75,7 +75,7 @@ def render_latex_to_image(
             cleaned = True  # Mark that we changed something and should loop again
 
     if not raw_latex_code:
-        logging.warning(
+        logging.error(
             f"LaTeX string became empty after removing delimiters. Original: '{original_input_for_log}'"
         )
         return None
