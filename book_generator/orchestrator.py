@@ -7,6 +7,7 @@ import time
 import requests
 
 from book_generator.config import load_config
+from book_generator.constants import DEFAULT_WRITING_TONE
 from book_generator.content_generator import (
     determine_gender_from_name,
     format_character_list_for_prompt,
@@ -31,8 +32,6 @@ from book_generator.content_generator import (
 from book_generator.docx_builder import assemble_docx, assemble_marketing_docx
 from book_generator.llm_api import configure_gemini, setup_environment
 from book_generator.utils import sanitize_filename
-
-DEFAULT_WRITING_TONE = "academic, informative, yet engaging"
 
 
 def run_generation_process():

@@ -15,14 +15,12 @@ from docx.shared import Inches, Mm, Pt
 from lxml import html
 from PIL import Image
 
+from book_generator.constants import (
+    DEFAULT_DISPLAY_MATH_HEIGHT_INCHES,
+    DEFAULT_INLINE_MATH_HEIGHT_MULTIPLIER,
+    DEFAULT_WRITING_TONE,
+)
 from book_generator.utils import render_latex_to_image, sanitize_filename
-
-# --- Constants ---
-# Multiplier for inline math height based on font size
-DEFAULT_INLINE_MATH_HEIGHT_MULTIPLIER = 1.05
-# Height in inches for display math images
-DEFAULT_DISPLAY_MATH_HEIGHT_INCHES = 0.375
-
 
 # Helper function to apply formatting to a run
 def apply_formatting(run, bold=False, italic=False):
