@@ -27,7 +27,7 @@ def determine_gender_from_name(config, author_name):
         or not isinstance(author_name, str)
         or " " not in author_name.strip()
     ):
-        logging.warning(
+        logging.error(
             f"Invalid or potentially incomplete name provided ('{author_name}'). Cannot reliably determine gender."
         )
         return None  # Indicate failure
@@ -60,7 +60,7 @@ Do not add any introductory text, explanations, or quotation marks. Just the sin
             )
             return cleaned_gender
         else:
-            logging.warning(
+            logging.error(
                 f"API returned an unexpected value for gender ('{gender_text}'). Treating as undetermined."
             )
             return None  # Indicate failure or ambiguity
@@ -88,7 +88,7 @@ Do not add introductory text, explanations, or quotation marks."""
             logging.info(f"Successfully auto-generated random name: '{cleaned_name}'")
             return cleaned_name
         else:
-            logging.warning(
+            logging.error(
                 f"Generated name ('{name_text}') might be invalid (e.g., missing space). Using it anyway."
             )
             return cleaned_name if cleaned_name else None
@@ -125,7 +125,7 @@ def generate_random_topic(config):
             # Fallback seed in case RandomWords fails
             random_seed = f"fallback_seed_{uuid.uuid4().hex[:8]}"
             config["generation_params"]["random_topic_seed"] = random_seed
-            logging.warning(f"Using fallback seed: '{random_seed}'")
+            logging.error(f"Using fallback seed: '{random_seed}'")
 
     prompt = f"""Generate a topic for a book.
 Random seed: {random_seed}
@@ -142,7 +142,7 @@ Output in British English."""
             logging.info(f"Successfully auto-generated random topic: '{cleaned_topic}'")
             return cleaned_topic
         else:
-            logging.warning("Generated random topic was empty after cleaning.")
+            logging.error("Generated random topic was empty after cleaning.")
             return None
     else:
         logging.error("Failed to generate random topic via API.")
@@ -173,7 +173,7 @@ Output in British English."""
             logging.info(f"Successfully auto-generated setting:\n'{cleaned_setting}'")
             return cleaned_setting
         else:
-            logging.warning("Generated setting was empty after cleaning.")
+            logging.error("Generated setting was empty after cleaning.")
             return None
     else:
         logging.error("Failed to generate setting via API.")
@@ -191,7 +191,7 @@ def generate_writing_tone(config):
     )
 
     if main_topic == "[No Main Topic Provided]" or setting == "[No  Setting Provided]":
-        logging.warning(
+        logging.error(
             "Cannot generate specific writing tone without 'main_topic' and 'setting'. Using a generic prompt."
         )
         prompt = f"""Generate some words describing a suitable writing tone
@@ -210,7 +210,7 @@ text. Output in British English."""
             logging.info(f"Successfully auto-generated writing tone: '{cleaned_tone}'")
             return cleaned_tone
         else:
-            logging.warning("Generated writing tone was empty after cleaning.")
+            logging.error("Generated writing tone was empty after cleaning.")
             return None
     else:
         logging.error("Failed to generate writing tone via API.")
@@ -271,12 +271,12 @@ Do not add introductory text. Output in British English."""
             logging.info(f"Successfully generated subtitle: {cleaned_subtitle}")
             return cleaned_subtitle
         else:
-            logging.warning(
+            logging.error(
                 "Generated subtitle was empty after cleaning. No subtitle will be used."
             )
             return None
     else:
-        logging.warning("Failed to generate subtitle. No subtitle will be used.")
+        logging.error("Failed to generate subtitle. No subtitle will be used.")
         return None
 
 
@@ -308,7 +308,7 @@ def is_book_non_fiction(config, book_title):
     )  # Corrected variable name
 
     if main_topic == "[No Main Topic Provided]":
-        logging.warning(
+        logging.error(
             "Cannot determine book type for character list decision: 'main_topic' is missing. "
             "Assuming fiction to be safe and allow character generation if not explicitly disabled."
         )
@@ -347,7 +347,7 @@ Answer with only 'yes' or 'no'. Do not add any explanations, quotation marks, or
             )
             determined_is_non_fiction = False
         else:
-            logging.warning(
+            logging.error(
                 f"Unexpected response from Gemini for non-fiction check ('{response_text}'). "
                 "Treating as fiction/indeterminate."
             )
@@ -482,7 +482,7 @@ Output in British English.
 
             return characters
         else:
-            logging.warning(
+            logging.error(
                 f"Could not parse character list from API response. Response:\n{cleaned_text}"
             )
             gen_params["character_list"] = None
@@ -638,13 +638,13 @@ Output in British English."""
             )
             return cleaned_summary
         else:
-            logging.warning(
+            logging.error(
                 f"Generated summary for '{chapter_title}' was empty after cleaning."
             )
             # Return placeholder if summary is empty after cleaning
             return f"Placeholder summary for chapter '{chapter_title}' focusing on {config['generation_params']['main_topic']}."
     else:
-        logging.warning(
+        logging.error(
             f"Failed to generate summary for chapter '{chapter_title}'. Using placeholder."
         )
         return f"Placeholder summary for chapter '{chapter_title}' focusing on {config['generation_params']['main_topic']}."
@@ -744,7 +744,7 @@ not contain subtitles.
             )
             return section_titles
         else:
-            logging.warning(
+            logging.error(
                 f"Could not parse section titles for '{chapter_title}' from API response or response was empty. Using placeholders. Response:\n{titles_text}"
             )
             return [
@@ -967,7 +967,7 @@ Output in British English.
             else:
                 processed_content = ""
         else:
-            logging.warning(f"Failed to generate content for {element}.")
+            logging.error(f"Failed to generate content for {element}.")
             # processed_content already holds the error message
 
         # Ensure Foreword key exists even if not generated, to avoid key errors later
@@ -1034,7 +1034,7 @@ Output in British English.
             )
             return subsection_titles
         else:
-            logging.warning(
+            logging.error(
                 f"Could not parse appendix subsection titles from API response: {titles_text}"
             )
             return []
@@ -1133,7 +1133,7 @@ Output in British English."""
                 if sub_content_md:
                     current_item["content"] = sub_content_md
                 else:
-                    logging.warning(
+                    logging.error(
                         f"Content generation failed for Appendix subsection: '{sub_title}'. Adding placeholder."
                     )
                     current_item["content"] = (
@@ -1144,7 +1144,7 @@ Output in British English."""
             if appendix_items:  # If we have items (even with failed content)
                 back_matter["appendix"] = appendix_items
             else:  # Should not happen if appendix_subsection_titles was non-empty, but as a safeguard
-                logging.warning(
+                logging.error(
                     "Appendix subsection titles were present, but no items were created. Appendix will be placeholder."
                 )
                 back_matter["appendix"] = (
@@ -1152,7 +1152,7 @@ Output in British English."""
                 )
 
         else:
-            logging.warning(
+            logging.error(
                 "Failed to generate appendix subsection titles. Appendix will be minimal or placeholder."
             )
             back_matter["appendix"] = (
@@ -1204,12 +1204,12 @@ Output in British English."""
             logging.info("Successfully generated book blurb.")
             return cleaned_blurb
         else:
-            logging.warning(
+            logging.error(
                 "Generated book blurb was empty after cleaning. Using placeholder."
             )
             return f"Placeholder blurb for book '{book_title}'."
     else:
-        logging.warning("Failed to generate book blurb. Using placeholder.")
+        logging.error("Failed to generate book blurb. Using placeholder.")
         return f"Placeholder blurb for book '{book_title}'."
 
 
@@ -1218,7 +1218,7 @@ def generate_overall_summary(config, book_title, summary_context):
     logging.info(f"Generating overall book summary for: '{book_title}'...")
 
     if not summary_context or summary_context == "[No chapter summaries available]":
-        logging.warning(
+        logging.error(
             "Cannot generate overall summary: No chapter summaries available."
         )
         return f"Placeholder overall summary for the book '{book_title}'."
@@ -1242,12 +1242,12 @@ Output in British English."""
             logging.info("Successfully generated overall book summary.")
             return cleaned_summary
         else:
-            logging.warning(
+            logging.error(
                 "Generated overall summary was empty after cleaning. Using placeholder."
             )
             return f"Placeholder overall summary for the book '{book_title}'."
     else:
-        logging.warning(
+        logging.error(
             "Failed to generate overall book summary via API. Using placeholder."
         )
         return f"Placeholder overall summary for the book '{book_title}'."
@@ -1256,7 +1256,7 @@ Output in British English."""
 def save_summary_to_markdown(book_title, overall_summary, output_dir):
     """Saves the overall book summary to a Markdown file."""
     if not overall_summary:
-        logging.warning("No overall summary provided to save.")
+        logging.error("No overall summary provided to save.")
         return
 
     filename_stem = sanitize_filename(book_title)

@@ -6,7 +6,7 @@ import pathlib
 import sys
 import time
 
-from google.genai.types import GenerationConfig
+from google.genai.types import GenerateContentConfig
 import google.genai as genai
 import requests
 from dotenv import load_dotenv
@@ -43,7 +43,7 @@ def get_cache_path(prompt_text, cache_dir, cache_prefix=None):
             filename_base = f"{sanitized_prefix}_{prompt_hash}"
             logging.debug(f"Using cache prefix: '{sanitized_prefix}'")
         else:
-            logging.warning(
+            logging.error(
                 f"Cache prefix '{cache_prefix}' sanitized to empty string. Using hash only."
             )
 
@@ -62,7 +62,7 @@ def load_from_cache(prompt_text, cache_dir, cache_prefix=None):
                 logging.info(f"Cache hit for file: {cache_file.name}")
                 return cached_data["response"]
             else:
-                logging.warning(f"Invalid cache file format: {cache_file}. Ignoring.")
+                logging.error(f"Invalid cache file format: {cache_file}. Ignoring.")
                 return None
         except Exception as e:
             logging.error(f"Error reading cache file {cache_file}: {e}")
@@ -127,7 +127,9 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
             # logging.info(f"Gemini API Prompt for model '{model_name}' (first 500 chars):\n{prompt[:500]}...")
 
         client = genai.Client()
-        generation_config = GenerationConfig(temperature=temperature)
+        generation_config = GenerateContentConfig(
+            temperature=temperature, safety_settings=safety_settings
+        )
 
         # Count tokens for Gemini prompt
         try:
@@ -139,35 +141,43 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                 f"Gemini prompt token count for model '{model_name}': {prompt_token_count} tokens."
             )
         except Exception as e_token:
-            logging.warning(
-                f"Could not count tokens for Gemini prompt (model '{model_name}'): {e_token}"
+            logging.error(
+                f"Could not count tokens for Gemini prompt (model '{model_name}'): {e_token}",
+                exc_info=True
             )
 
         for attempt in range(max_retries):
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=generation_config,
-                    safety_settings=safety_settings,
-                    stream=stream_gemini,
-                )
+                if stream_gemini:
+                    response = client.models.generate_content_stream(
+                        model=model_name,
+                        contents=prompt,
+                        config=generation_config,
+                    )
+                else:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=generation_config,
+                    )
 
                 if stream_gemini:
                     logging.info(f"Streaming Gemini response for model '{model_name}':")
                     full_response_text_parts = []
                     print(f"\n--- Gemini Stream ({model_name}) ---")
                     for chunk in response:
-                        if chunk.parts:
+                        if hasattr(chunk, "text"):
                             response_part = chunk.text
                             print(
                                 response_part, end="", flush=True
                             )  # Stream to console
                             full_response_text_parts.append(response_part)
                         elif (
-                            chunk.prompt_feedback and chunk.prompt_feedback.block_reason
+                            hasattr(chunk, "prompt_feedback")
+                            and chunk.prompt_feedback
+                            and chunk.prompt_feedback.block_reason
                         ):  # Prompt itself is blocked
-                            logging.warning(
+                            logging.error(
                                 f"Gemini API stream blocked. Reason: {chunk.prompt_feedback.block_reason}"
                             )
                             print(f"\n--- End Gemini Stream (Blocked) ---")
@@ -189,7 +199,7 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                         response.prompt_feedback
                         and response.prompt_feedback.block_reason
                     ):
-                        logging.warning(
+                        logging.error(
                             f"Gemini API call blocked due to prompt. Reason: {response.prompt_feedback.block_reason}. Will not retry."
                         )
                         return None  # Explicitly do not retry prompt blocks
@@ -210,11 +220,11 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                                     0
                                 ].finish_reason.name  # Use .name for enum
                         except (AttributeError, IndexError):
-                            logging.warning(
+                            logging.error(
                                 "Could not determine finish reason from response."
                             )
 
-                        logging.warning(
+                        logging.error(
                             f"API call returned no content or parts (and was not prompt-blocked). Finish Reason: {finish_reason}. Will attempt retry if applicable."
                         )
                         # response_text remains None
@@ -225,16 +235,17 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                         )
                         return response_text
                     else:
-                        logging.warning(
+                        logging.error(
                             f"API attempt {attempt + 1} for model {model_name} resulted in no content (response_text is None). Will proceed to retry logic."
                         )
 
             except Exception as e:
-                logging.warning(
-                    f"Gemini API call attempt {attempt + 1} for model {model_name} failed: {e}"
+                logging.error(
+                    f"Gemini API call attempt {attempt + 1} for model {model_name} failed: {e}",
+                    exc_info=True,
                 )
                 if "quota" in str(e).lower():  # Basic check for quota issues
-                    logging.warning(
+                    logging.error(
                         f"Gemini API quota likely exceeded: {e}. Retrying as per configuration..."
                     )
                     # Removed 'return None' to allow retry for quota issues
@@ -312,7 +323,7 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
                 f"Ollama context window size (num_ctx) set to: {payload['options']['num_ctx']}"
             )
         except ValueError:
-            logging.warning(
+            logging.error(
                 f"Invalid 'context_window_size' value: {context_window_size}. It must be an integer. Using Ollama's default."
             )
 
@@ -335,8 +346,9 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
                 f"Ollama client-side token count for prompt (tokenizer: '{tokenizer_model_name}', model: '{model_name}'): {num_tokens} tokens."
             )
         except Exception as e_token_ollama:
-            logging.warning(
-                f"Could not count tokens for Ollama prompt using tokenizer '{tokenizer_model_name}' (model: '{model_name}'): {e_token_ollama}"
+            logging.error(
+                f"Could not count tokens for Ollama prompt using tokenizer '{tokenizer_model_name}' (model: '{model_name}'): {e_token_ollama}",
+                exc_info=True,
             )
             logging.info(
                 f"Ollama API for model '{model_name}': Standard Ollama API does not provide a direct prompt token count. Client-side estimation failed."
@@ -394,7 +406,7 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
                             return None
                 # This part might be reached if the stream ends unexpectedly without a 'done: true'
                 print(f"\n--- End Ollama Stream (Unexpected End) ---")
-                logging.warning("Ollama stream ended without a 'done: true' message.")
+                logging.error("Ollama stream ended without a 'done: true' message.")
                 return (
                     "".join(full_response_text_parts).strip()
                     if full_response_text_parts
@@ -414,13 +426,14 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
                     )
                     return response_text.strip()
                 else:
-                    logging.warning(
+                    logging.error(
                         f"Ollama API response for model '{model_name}' did not contain 'response' key. Attempt {attempt + 1}/{max_retries}. Data: {response_data}"
                     )
 
         except requests.exceptions.HTTPError as e:
-            logging.warning(
-                f"Ollama API call (model '{model_name}') attempt {attempt + 1} failed with HTTPError: {e}. Status: {e.response.status_code}"
+            logging.error(
+                f"Ollama API call (model '{model_name}') attempt {attempt + 1} failed with HTTPError: {e}. Status: {e.response.status_code}",
+                exc_info=True,
             )
             if e.response.status_code == 404:  # Model not found
                 try:
@@ -434,8 +447,9 @@ def _call_ollama_api_internal(prompt, config, cache_prefix=None):
         except (
             requests.exceptions.RequestException
         ) as e:  # Covers ConnectionError, Timeout, etc.
-            logging.warning(
-                f"Ollama API call (model '{model_name}') attempt {attempt + 1} failed: {e}"
+            logging.error(
+                f"Ollama API call (model '{model_name}') attempt {attempt + 1} failed: {e}",
+                exc_info=True,
             )
 
         if attempt < max_retries - 1:

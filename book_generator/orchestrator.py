@@ -166,7 +166,7 @@ def run_generation_process():
             logging.info(f"Auto-generated setting: '{generated_setting[:100]}...'")
         else:
             # If generation fails and it wasn't in config, use a placeholder.
-            logging.warning("Failed to auto-generate setting. Using placeholder.")
+            logging.error("Failed to auto-generate setting. Using placeholder.")
             generation_params["setting"] = "[Setting Generation Failed]"
     else:
         # If setting was provided in config, use it.
@@ -212,7 +212,7 @@ def run_generation_process():
             f"Author name missing. Generating name for specified gender: '{author_gender}'..."
         )
         if author_gender not in valid_genders:
-            logging.warning(
+            logging.error(
                 f"Provided gender '{author_gender}' is not standard ({valid_genders}). Attempting name generation anyway."
             )
             # Decide if you want to default the gender here or proceed. Let's proceed.
@@ -243,7 +243,7 @@ def run_generation_process():
             )
         else:
             # If determination fails, you need a fallback. Using 'other' or exiting are options.
-            logging.warning(
+            logging.error(
                 f"Could not determine gender for '{author_name}'. Falling back to 'other'."
             )
             author_gender = "other"
@@ -256,7 +256,7 @@ def run_generation_process():
         # Both name and gender were provided
         logging.info(f"Using Author Name from config: '{author_name}'")
         if author_gender not in valid_genders:
-            logging.warning(
+            logging.error(
                 f"Author gender ('{author_gender}') from config is not standard ({valid_genders}). Using it anyway."
             )
         logging.info(f"Using Author Gender from config: '{author_gender}'")
@@ -300,7 +300,7 @@ def run_generation_process():
             generation_params["writing_tone"] = (
                 writing_tone  # Store default back in config
             )
-            logging.warning(
+            logging.error(
                 f"Failed to auto-generate writing tone. Using default: '{writing_tone}'"
             )
     else:
@@ -313,7 +313,7 @@ def run_generation_process():
     ):  # Should ideally not happen due to fallback, but as a safeguard
         writing_tone = DEFAULT_WRITING_TONE
         generation_params["writing_tone"] = writing_tone
-        logging.warning(
+        logging.error(
             f"Writing tone was still empty after checks. Using default: '{writing_tone}'"
         )
 
@@ -431,7 +431,7 @@ def run_generation_process():
         summary_context = "Chapter summaries:\n" + "\n\n".join(summary_parts)
         logging.debug(f"Generated summary context:\n{summary_context}")
     else:
-        logging.warning(
+        logging.error(
             "No valid chapter summaries generated to create summary context."
         )
 
@@ -516,7 +516,7 @@ def run_generation_process():
                 not chapter_content_as_single_block
                 or "Content generation failed" in chapter_content_as_single_block
             ):
-                logging.warning(
+                logging.error(
                     f"Content generation potentially failed for fiction chapter '{chap_title}' (treated as single section)."
                 )
         else:  # Non-fiction book, proceed with normal section generation
@@ -531,7 +531,7 @@ def run_generation_process():
             )
 
             if not section_titles:
-                logging.warning(
+                logging.error(
                     f"No section titles generated for chapter '{chap_title}'. Adding chapter summary as placeholder content."
                 )
                 # Add chapter summary as content if no sections are generated
@@ -565,7 +565,7 @@ def run_generation_process():
                     not section_content
                     or "Content generation failed" in section_content
                 ):
-                    logging.warning(
+                    logging.error(
                         f"Content generation potentially failed for Chapter '{chap_title}', Section '{sec_title}'."
                     )
 

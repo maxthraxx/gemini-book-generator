@@ -170,7 +170,7 @@ def process_node_content(
                                 vertical_offset_half_points
                             )
                         except (ValueError, TypeError):
-                            logging.warning(
+                            logging.error(
                                 f"Invalid value '{vertical_offset_half_points}' for 'inline_math_vertical_offset_half_points' in config. Using default {default_offset}."
                             )
                             vertical_offset_half_points = default_offset
@@ -196,7 +196,7 @@ def process_node_content(
                     )
                     apply_formatting(err_run, is_bold, is_italic)
             else:
-                logging.warning("-> Found inline math span but it was empty.")
+                logging.error("-> Found inline math span but it was empty.")
                 err_run = paragraph.add_run("[Err: Empty Math Span]")
                 apply_formatting(err_run, is_bold, is_italic)
 
@@ -393,7 +393,7 @@ def add_paragraph_from_html_node(
                 logging.debug(f"Successfully rendered display math to {image_path}")
                 add_display_math_image(image_path, latex_code_with_delimiters)
             else:
-                logging.warning(
+                logging.error(
                     f"Rendering failed for display math: {latex_code_with_delimiters[:50]}..."
                 )
                 if hasattr(container, "add_paragraph"):
@@ -402,7 +402,7 @@ def add_paragraph_from_html_node(
                     )
                     p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
         else:
-            logging.warning("Found display math div but it was empty.")
+            logging.error("Found display math div but it was empty.")
         is_handled = True
 
     # --- Handle Paragraphs (<p>) ---
@@ -432,7 +432,7 @@ def add_paragraph_from_html_node(
                 if image_path:
                     add_display_math_image(image_path, latex_code_with_delimiters)
                 else:
-                    logging.warning(
+                    logging.error(
                         f"Rendering failed for display math span in p: {latex_code_with_delimiters[:50]}..."
                     )
                     if hasattr(container, "add_paragraph"):
@@ -441,7 +441,7 @@ def add_paragraph_from_html_node(
                         )
                         p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
             else:
-                logging.warning("Found display math span within p but it was empty.")
+                logging.error("Found display math span within p but it was empty.")
             is_handled = True
 
         # --- Default paragraph handling ---
@@ -470,13 +470,13 @@ def add_paragraph_from_html_node(
         logging.debug("Processing table...")
         html_rows = node.xpath(".//tr")  # Get all rows in the table
         if not html_rows:
-            logging.warning("Table tag found but contains no rows (tr). Skipping.")
+            logging.error("Table tag found but contains no rows (tr). Skipping.")
         else:
             # Determine number of columns from the first row
             first_row_cells = html_rows[0].xpath("./th|./td")
             num_cols = len(first_row_cells)
             if num_cols == 0:
-                logging.warning(
+                logging.error(
                     "Table's first row contains no cells (th/td). Skipping table."
                 )
             else:
@@ -504,7 +504,7 @@ def add_paragraph_from_html_node(
                                 equation_image_dir,
                             )
                         else:
-                            logging.warning(
+                            logging.error(
                                 f"Row has more cells ({len(html_cells)}) than table columns ({num_cols}). Ignoring extra cells."
                             )
         is_handled = True
@@ -546,7 +546,7 @@ def add_paragraph_from_html_node(
                 )
             elif child_node.tag in ["ul", "ol"]:
                 # Handle potentially invalid nested lists directly under lists
-                logging.warning(
+                logging.error(
                     f"Found nested <{child_node.tag}> directly inside <{node.tag}>. Processing recursively."
                 )
                 add_paragraph_from_html_node(
@@ -560,7 +560,7 @@ def add_paragraph_from_html_node(
                 )
             # Ignore other tags or text directly within ul/ol for now, or log warnings
             elif (child_node.text or "").strip():
-                logging.warning(
+                logging.error(
                     f"Ignoring text '{child_node.text.strip()[:50]}...' found directly inside <{node.tag}>."
                 )
 
@@ -575,7 +575,7 @@ def add_paragraph_from_html_node(
         style_name = f"List Bullet{style_suffix}"
 
         if style_name not in doc.styles:
-            logging.warning(
+            logging.error(
                 f"Style '{style_name}' not found. Falling back to 'List Bullet' or 'Normal'."
             )
             # Fallback logic: try base list style, then Normal
@@ -859,7 +859,7 @@ def add_paragraph_from_html_node(
         and node.tag is not None  # Ensure it's a tag, not comment/text
         and node.tag not in known_inline_or_handled
     ):
-        logging.warning(
+        logging.error(
             f"Unhandled block tag <{node.tag}> encountered. Attempting to process its content as plain text."
         )
         plain_text = "".join(node.itertext()).strip()
@@ -965,7 +965,7 @@ def markdown_to_docx(
             )
         except UnicodeDecodeError:
             # Fallback if utf-8 fails (less common but possible)
-            logging.warning(
+            logging.error(
                 "UTF-8 decoding failed for HTML string, trying 'latin-1' fallback."
             )
             html_tree_root = html.fromstring(
@@ -1323,7 +1323,7 @@ def assemble_docx(
         section0.page_height = Mm(297)
         logging.info("Set page size to A4.")
     else:
-        logging.warning(
+        logging.error(
             f"Unsupported page_size_preset '{page_preset}'. Using default Word size."
         )
         # Use default size implicitly
@@ -1332,7 +1332,7 @@ def assemble_docx(
         page_width_mm = section0.page_width / Mm(1)
         logging.info(f"Actual page width from section object: {page_width_mm:.2f} mm")
     else:
-        logging.warning("Could not determine page width from section object.")
+        logging.error("Could not determine page width from section object.")
 
     # --- Apply Margins and Gutter (Mirrored) ---
     try:
@@ -1745,7 +1745,7 @@ def assemble_marketing_docx(
             # Add basic bullet formatting if needed
 
     except Exception as e:
-        logging.warning(f"Could not apply basic styles to marketing doc: {e}")
+        logging.error(f"Could not apply basic styles to marketing doc: {e}", exc_info=True)
 
     # --- Add Book Details Section ---
     doc.add_paragraph("Book Details", style="Heading 1")
@@ -1775,7 +1775,7 @@ def assemble_marketing_docx(
         model_name_used = api_settings_local.get("ollama", {}).get("model", "")
     else:
         model_name_used = "[Unknown API Provider or Model]"
-        logging.warning(
+        logging.error(
             f"Unknown API provider '{api_provider_local}' when trying to get model name for marketing doc."
         )
 
