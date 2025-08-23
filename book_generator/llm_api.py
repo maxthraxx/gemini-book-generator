@@ -6,7 +6,7 @@ import pathlib
 import sys
 import time
 
-import google.generativeai as genai
+import google.genai as genai
 import requests
 from dotenv import load_dotenv
 from transformers import AutoTokenizer
@@ -25,16 +25,6 @@ def setup_environment():
         sys.exit(1)
     logging.info("Environment variables loaded and API key found.")
     return api_key
-
-
-def configure_gemini(api_key):
-    """Configures the Google Generative AI client."""
-    try:
-        genai.configure(api_key=api_key)
-        logging.info("Google Generative AI client configured.")
-    except Exception as e:
-        logging.error(f"Error configuring Google Generative AI: {e}")
-        sys.exit(1)
 
 
 # --- Caching Mechanism ---
@@ -135,12 +125,14 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
             # For very long prompts, you might want to log only a portion or a summary
             # logging.info(f"Gemini API Prompt for model '{model_name}' (first 500 chars):\n{prompt[:500]}...")
 
-        model = genai.GenerativeModel(model_name)
-        generation_config = genai.types.GenerationConfig(temperature=temperature)
+        client = genai.Client()
+        generation_config = {"temperature": temperature}
 
         # Count tokens for Gemini prompt
         try:
-            token_count_response = model.count_tokens(prompt)
+            token_count_response = client.models.count_tokens(
+                model=model_name, contents=prompt
+            )
             prompt_token_count = token_count_response.total_tokens
             logging.info(
                 f"Gemini prompt token count for model '{model_name}': {prompt_token_count} tokens."
@@ -152,8 +144,9 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
 
         for attempt in range(max_retries):
             try:
-                response = model.generate_content(
-                    prompt,
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
                     generation_config=generation_config,
                     safety_settings=safety_settings,
                     stream=stream_gemini,
@@ -235,18 +228,6 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                             f"API attempt {attempt + 1} for model {model_name} resulted in no content (response_text is None). Will proceed to retry logic."
                         )
 
-            except genai.types.BlockedPromptException as bpe:
-                logging.error(
-                    f"Gemini API call attempt {attempt + 1} for model {model_name} failed due to a blocked prompt: {bpe}. Will not retry."
-                )
-                return None  # Do not retry if the prompt itself is blocked
-            except genai.types.StopCandidateException as sce:
-                # This exception means the response generation was stopped (e.g., safety, recitation).
-                # Retrying might yield a different result, especially with temperature > 0.
-                logging.warning(
-                    f"Gemini API call attempt {attempt + 1} for model {model_name} stopped during candidate generation: {sce}. Retrying..."
-                )
-                # No 'return None' here, so it falls through to the retry delay logic.
             except Exception as e:
                 logging.warning(
                     f"Gemini API call attempt {attempt + 1} for model {model_name} failed: {e}"

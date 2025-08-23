@@ -29,7 +29,7 @@ from book_generator.content_generator import (
     save_summary_to_markdown,
 )
 from book_generator.docx_builder import assemble_docx, assemble_marketing_docx
-from book_generator.llm_api import configure_gemini, setup_environment
+from book_generator.llm_api import setup_environment
 from book_generator.utils import sanitize_filename
 
 DEFAULT_WRITING_TONE = "academic, informative, yet engaging"
@@ -45,8 +45,7 @@ def run_generation_process():
     # Determine API provider
     api_provider = api_settings.get("provider", "gemini")
     if api_provider == "gemini":
-        api_key = setup_environment()  # This function exits if key not found
-        configure_gemini(api_key)  # This function exits on error
+        setup_environment()  # This function exits if key not found
         logging.info("Gemini API provider configured.")
     elif api_provider == "ollama":
         ollama_settings = config.get("ollama_settings", {})
