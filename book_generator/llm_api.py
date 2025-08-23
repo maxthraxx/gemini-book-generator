@@ -6,7 +6,7 @@ import pathlib
 import sys
 import time
 
-from google.genai.types import GenerationConfig
+from google.genai.types import GenerateContentConfig
 import google.genai as genai
 import requests
 from dotenv import load_dotenv
@@ -127,7 +127,9 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
             # logging.info(f"Gemini API Prompt for model '{model_name}' (first 500 chars):\n{prompt[:500]}...")
 
         client = genai.Client()
-        generation_config = GenerationConfig(temperature=temperature)
+        generation_config = GenerateContentConfig(
+            temperature=temperature, safety_settings=safety_settings
+        )
 
         # Count tokens for Gemini prompt
         try:
@@ -145,27 +147,34 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
 
         for attempt in range(max_retries):
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=generation_config,
-                    safety_settings=safety_settings,
-                    stream=stream_gemini,
-                )
+                if stream_gemini:
+                    response = client.models.generate_content_stream(
+                        model=model_name,
+                        contents=prompt,
+                        config=generation_config,
+                    )
+                else:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=generation_config,
+                    )
 
                 if stream_gemini:
                     logging.info(f"Streaming Gemini response for model '{model_name}':")
                     full_response_text_parts = []
                     print(f"\n--- Gemini Stream ({model_name}) ---")
                     for chunk in response:
-                        if chunk.parts:
+                        if hasattr(chunk, "text"):
                             response_part = chunk.text
                             print(
                                 response_part, end="", flush=True
                             )  # Stream to console
                             full_response_text_parts.append(response_part)
                         elif (
-                            chunk.prompt_feedback and chunk.prompt_feedback.block_reason
+                            hasattr(chunk, "prompt_feedback")
+                            and chunk.prompt_feedback
+                            and chunk.prompt_feedback.block_reason
                         ):  # Prompt itself is blocked
                             logging.warning(
                                 f"Gemini API stream blocked. Reason: {chunk.prompt_feedback.block_reason}"
