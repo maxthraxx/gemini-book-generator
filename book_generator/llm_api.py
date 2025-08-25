@@ -189,8 +189,10 @@ def _call_gemini_api_internal(prompt, config, cache_prefix=None):
                     logging.info(
                         f"Gemini API stream completed for model '{model_name}'."
                     )
-                    final_text = "".join(full_response_text_parts).strip()
-                    return final_text
+                    if full_response_text_parts:
+                        final_text = "".join(str(p) for p in full_response_text_parts).strip()
+                        return final_text
+                    return ""
                 else:  # Not streaming
                     response_text = None  # Initialize
 
