@@ -1151,6 +1151,7 @@ def assemble_docx(
     filename_stem = sanitize_filename(book_title)
     # Construct the full output path using the provided directory
     output_filename = output_dir / f"{filename_stem}.docx"
+    print(f"Saving main book to: {output_filename.resolve()}")
     logging.info(f"Main book filename set to: '{output_filename}'")
 
     style_config = config.get("style_params", {})
@@ -1702,6 +1703,7 @@ def assemble_marketing_docx(
     output_filename = (
         output_dir / f"{main_book_filename_stem}_Marketing.docx"
     )  # Use pathlib's / operator
+    print(f"Saving marketing book to: {output_filename.resolve()}")
     logging.info(f"Assembling marketing DOCX file: '{output_filename}'")
     doc = Document()
     style_config = config.get("style_params", {})

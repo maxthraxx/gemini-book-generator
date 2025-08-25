@@ -8,13 +8,12 @@ import requests
 
 from book_generator.config import load_config
 from book_generator.constants import DEFAULT_WRITING_TONE
-from book_generator.content_generator import (
+from book_generator.common_generator import (
     determine_gender_from_name,
     format_character_list_for_prompt,
     generate_back_matter,
     generate_book_blurb,
     generate_book_title,
-    generate_chapter_outline,
     generate_chapter_summary,
     generate_character_list,
     generate_front_matter,
@@ -22,15 +21,20 @@ from book_generator.content_generator import (
     generate_random_gender,
     generate_random_name,
     generate_random_topic,
-    generate_section_content,
-    generate_section_titles,
     generate_setting,
     generate_writing_tone,
     is_book_non_fiction,
     save_summary_to_markdown,
+)
+from book_generator.fiction_generator import (
     generate_overall_story,
     generate_fiction_chapter_outline,
     generate_fiction_chapter_content,
+)
+from book_generator.non_fiction_generator import (
+    generate_chapter_outline,
+    generate_section_titles,
+    generate_section_content,
 )
 from book_generator.docx_builder import assemble_docx, assemble_marketing_docx
 from book_generator.llm_api import setup_environment
