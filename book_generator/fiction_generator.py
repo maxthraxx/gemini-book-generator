@@ -53,7 +53,7 @@ Based on the following overall story:
 And the following characters:
 {character_context}
 
-Break down the story into approximately 75 chapters. For each chapter, provide a title and a one-paragraph summary.
+Break down the story into 50 chapters. For each chapter, provide a title and a one-paragraph summary.
 The chapters should logically follow the progression of the story.
 
 Format the output as a numbered list of chapters. For each chapter, provide the title and then the summary.
