@@ -20,7 +20,7 @@ Based on the main topic '{main_topic}', a setting described as:
 "{setting}", and the following characters:
 {character_context}
 
-Write a detailed overall story of about 2000 words. This story will serve as the master plot for the entire book.
+Write a detailed overall story. This story will serve as the master plot for the entire book.
 The story should have a clear beginning, middle, and end.
 It should introduce the main conflict, develop the plot, and provide a resolution.
 Output only the story text. Do not add introductory text.
