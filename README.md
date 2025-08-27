@@ -1,6 +1,6 @@
 # LLM Book Generator 📚🤖
 
-AI Book Weaver is a powerful Python-based command-line tool that automates the creation of entire books, from initial concept to a fully formatted DOCX manuscript. It leverages Large Language Models (LLMs) like Google's Gemini and local Ollama instances to generate diverse content, including titles, chapter outlines, detailed section text, front and back matter, and even marketing materials.
+LLM Book Generator is a powerful Python-based command-line tool that automates the creation of entire books, from initial concept to a fully formatted DOCX manuscript. It leverages Large Language Models (LLMs) like Google's Gemini and local Ollama instances to generate diverse content, including titles, chapter outlines, detailed section text, front and back matter, and even marketing materials.
 
 ## Features
 
