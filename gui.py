@@ -18,8 +18,10 @@ class QTextEditHandler(QObject, logging.Handler):
     new_log_record = Signal(str)
 
     def __init__(self):
+        # The original code called QObject.__init__ twice, causing a RuntimeError.
+        # The first call is implicit via super(), and the second was likely a typo.
         super().__init__()
-        QObject.__init__(self)
+        logging.Handler.__init__(self)
         self.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
     def emit(self, record):
