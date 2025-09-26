@@ -127,11 +127,11 @@ style_params:
 
   page_size_preset: "6x9" # Currently only "6x9" is explicitly supported for margins
   margins_mm:
-      top: 18
-      bottom: 18
-      right: 18
-      left: 18
-      gutter: 5
+      top: 17
+      bottom: 17
+      right: 17
+      left: 17
+      gutter: 10
 
   # Multiplier for inline math height based on font size
   inline_math_height_multiplier: 1.05
